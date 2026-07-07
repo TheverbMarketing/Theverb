@@ -93,6 +93,20 @@
   color: hsl(0 0% 35%);
 }
 
+/* Destaque suave ao chegar num card de post via âncora (#post-id) */
+article[id^="post-"]:target {
+  animation: post-highlight 2s ease-out;
+}
+@keyframes post-highlight {
+  0% {
+    background-color: hsl(48 96% 95%);
+    border-color: hsl(0 0% 9%);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
 /* Placeholder do TipTap */
 .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

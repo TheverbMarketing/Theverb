@@ -1,15 +1,21 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Link2, FolderOpen } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PublishControls } from "@/components/dashboard/publish-controls";
 import { PostEditor } from "@/components/dashboard/post-editor";
 import { DeleteButton } from "@/components/dashboard/delete-button";
+import { CopyPostButton } from "@/components/dashboard/copy-post-button";
 import { TypeBadge } from "@/components/shared/type-badge";
 import { RichTextRenderer } from "@/components/public/rich-text-renderer";
 import { deletePost } from "./posts-actions";
 import { formatDate } from "@/lib/utils";
-import type { EditorialLine, Post, Client } from "@/types/database";
+import {
+  getPostLinks,
+  type EditorialLine,
+  type Post,
+  type Client,
+} from "@/types/database";
 
 export default async function EditorialDetailPage({
   params,
@@ -79,58 +85,99 @@ export default async function EditorialDetailPage({
         </div>
       ) : (
         <div className="space-y-4">
-          {list.map((post, i) => (
-            <article
-              key={post.id}
-              className="group rounded-xl border border-neutral-200 p-7 transition-colors hover:border-neutral-300"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4">
-                  <span className="font-serif text-sm text-neutral-300 pt-1">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <TypeBadge type={post.type} />
-                      {post.scheduled_date && (
-                        <span className="text-xs uppercase tracking-[0.15em] text-neutral-400">
-                          {formatDate(post.scheduled_date)}
-                        </span>
+          {list.map((post, i) => {
+            const { referenceLinks, driveLinks } = getPostLinks(post.content);
+
+            return (
+              <article
+                key={post.id}
+                id={`post-${post.id}`}
+                className="group scroll-mt-24 rounded-xl border border-neutral-200 p-7 transition-colors hover:border-neutral-300 target:border-neutral-900 target:ring-1 target:ring-neutral-900"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <span className="font-serif text-sm text-neutral-300 pt-1">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <TypeBadge type={post.type} />
+                        {post.scheduled_date && (
+                          <span className="text-xs uppercase tracking-[0.15em] text-neutral-400">
+                            {formatDate(post.scheduled_date)}
+                          </span>
+                        )}
+                      </div>
+                      {post.title && (
+                        <h3 className="mt-3 font-serif text-2xl leading-tight">
+                          {post.title}
+                        </h3>
                       )}
                     </div>
-                    {post.title && (
-                      <h3 className="mt-3 font-serif text-2xl leading-tight">
-                        {post.title}
-                      </h3>
-                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-target:opacity-100">
+                    <CopyPostButton title={post.title} content={post.content} />
+                    <PostEditor
+                      editorialLineId={line.id}
+                      post={post}
+                      mode="edit"
+                    />
+                    <DeleteButton
+                      onDelete={async () => {
+                        "use server";
+                        await deletePost(post.id, line.id);
+                      }}
+                      title="Excluir conteúdo"
+                      description="Este post será removido permanentemente."
+                    />
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                  <PostEditor
-                    editorialLineId={line.id}
-                    post={post}
-                    mode="edit"
-                  />
-                  <DeleteButton
-                    onDelete={async () => {
-                      "use server";
-                      await deletePost(post.id, line.id);
-                    }}
-                    title="Excluir conteúdo"
-                    description="Este post será removido permanentemente."
+                <div className="mt-5 border-t border-neutral-100 pt-5 pl-8">
+                  <RichTextRenderer
+                    content={post.content}
+                    className="prose-sm line-clamp-4"
                   />
                 </div>
-              </div>
 
-              <div className="mt-5 border-t border-neutral-100 pt-5 pl-8">
-                <RichTextRenderer
-                  content={post.content}
-                  className="prose-sm line-clamp-4"
-                />
-              </div>
-            </article>
-          ))}
+                {/* ─── Links internos (só aparecem aqui no admin) ─── */}
+                {(referenceLinks.length > 0 || driveLinks.length > 0) && (
+                  <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-dashed border-neutral-100 pt-4 pl-8">
+                    <span className="mr-1 text-[10px] uppercase tracking-[0.15em] text-neutral-300">
+                      Interno
+                    </span>
+
+                    {driveLinks.map((href, idx) => (
+                      <a
+                        key={`drive-${idx}`}
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-[11px] font-medium text-blue-700 ring-1 ring-blue-100 transition-colors hover:bg-blue-100"
+                      >
+                        <FolderOpen className="h-3 w-3" />
+                        Arte {driveLinks.length > 1 ? idx + 1 : ""} (Drive)
+                      </a>
+                    ))}
+
+                    {referenceLinks.map((href, idx) => (
+                      <a
+                        key={`ref-${idx}`}
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1 text-[11px] font-medium text-neutral-600 ring-1 ring-neutral-200 transition-colors hover:bg-neutral-200"
+                      >
+                        <Link2 className="h-3 w-3" />
+                        Referência {referenceLinks.length > 1 ? idx + 1 : ""}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </article>
+            );
+          })}
         </div>
       )}
     </div>

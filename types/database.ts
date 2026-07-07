@@ -38,6 +38,15 @@ export interface Post {
   updated_at: string;
 }
 
+// Links internos do post (referências + artes no Drive).
+// Ficam guardados DENTRO do jsonb `content` (chave `meta`), então
+// nenhuma alteração de backend/schema é necessária. O TipTap ignora
+// chaves desconhecidas ao renderizar, e a página pública nunca exibe.
+export interface PostLinksMeta {
+  referenceLinks?: string[];
+  driveLinks?: string[];
+}
+
 // JSON do TipTap (alias simplificado de JSONContent)
 export type TiptapContent = {
   type?: string;
@@ -45,7 +54,20 @@ export type TiptapContent = {
   text?: string;
   marks?: { type: string; attrs?: Record<string, unknown> }[];
   attrs?: Record<string, unknown>;
+  // chave extra usada apenas pelo app (não é renderizada pelo TipTap)
+  meta?: PostLinksMeta;
 };
+
+// Helper: extrai os links do content de forma segura
+export function getPostLinks(content: TiptapContent | null): {
+  referenceLinks: string[];
+  driveLinks: string[];
+} {
+  return {
+    referenceLinks: content?.meta?.referenceLinks?.filter(Boolean) ?? [],
+    driveLinks: content?.meta?.driveLinks?.filter(Boolean) ?? [],
+  };
+}
 
 // Retorno da RPC pública
 export interface PublicEditorial {

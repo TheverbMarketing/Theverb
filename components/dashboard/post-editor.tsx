@@ -23,9 +23,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RichTextEditor } from "@/components/dashboard/rich-text-editor";
+import { LinkListInput } from "@/components/dashboard/link-list-input";
 import { createPost, updatePost } from "@/app/(dashboard)/editorials/[editorialId]/posts-actions";
 import {
   POST_TYPE_LABELS,
+  getPostLinks,
   type Post,
   type PostType,
   type TiptapContent,
@@ -45,6 +47,8 @@ export function PostEditor({
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
+  const initialLinks = getPostLinks(post?.content ?? null);
+
   const [title, setTitle] = useState(post?.title ?? "");
   const [type, setType] = useState<PostType>(post?.type ?? "single_post");
   const [date, setDate] = useState(post?.scheduled_date ?? "");
@@ -52,15 +56,40 @@ export function PostEditor({
     post?.content ?? null
   );
 
+  // Links internos (não aparecem na página pública da linha editorial)
+  const [referenceLinks, setReferenceLinks] = useState<string[]>(
+    initialLinks.referenceLinks
+  );
+  const [driveLinks, setDriveLinks] = useState<string[]>(
+    initialLinks.driveLinks
+  );
+
   function handleSave() {
     startTransition(async () => {
       try {
+        // Guarda os links dentro do próprio jsonb `content` (chave `meta`),
+        // sem precisar de nenhuma mudança no banco de dados.
+        const cleanRefs = referenceLinks.map((l) => l.trim()).filter(Boolean);
+        const cleanDrive = driveLinks.map((l) => l.trim()).filter(Boolean);
+
+        const base: TiptapContent =
+          content ?? { type: "doc", content: [] };
+
+        const fullContent: TiptapContent = {
+          ...base,
+          meta: {
+            referenceLinks: cleanRefs,
+            driveLinks: cleanDrive,
+          },
+        };
+
         const payload = {
           title: title.trim() || null,
           type,
           scheduled_date: date || null,
-          content,
+          content: fullContent,
         };
+
         if (mode === "edit" && post) {
           await updatePost(post.id, editorialLineId, payload);
           toast.success("Conteúdo atualizado.");
@@ -142,6 +171,28 @@ export function PostEditor({
           <div className="space-y-2">
             <Label>Conteúdo</Label>
             <RichTextEditor value={content} onChange={setContent} />
+          </div>
+
+          {/* ─── Links internos (uso interno; não aparecem na linha editorial pública) ─── */}
+          <div className="space-y-5 rounded-lg border border-dashed border-neutral-200 bg-neutral-50/50 p-4">
+            <p className="text-xs uppercase tracking-[0.15em] text-neutral-400">
+              Links internos · não aparecem para o cliente
+            </p>
+
+            <LinkListInput
+              label="Links de referência"
+              hint="Referências criativas, benchmarks, matérias, etc."
+              values={referenceLinks}
+              onChange={setReferenceLinks}
+            />
+
+            <LinkListInput
+              label="Arte do post (Google Drive)"
+              hint="Links do Drive onde está a arte final deste post."
+              placeholder="https://drive.google.com/..."
+              values={driveLinks}
+              onChange={setDriveLinks}
+            />
           </div>
         </div>
 
